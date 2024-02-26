@@ -1,0 +1,50 @@
+
+pipeline {
+    agent any
+    tools {
+        nodejs 'nodejs' 
+    }
+   environment {
+        HEROKU_API_KEY = credentials('heroku-api-key')
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                dir('Backend/online-auth-service') {
+                     sh 'npm install'
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                script {
+                     dir('Backend/online-auth-service') {
+                        sh 'npm run test'
+                     }
+                }
+            }
+            post {
+                failure {
+                    error 'Tests failed, stopping pipeline'
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                 dir('Backend/online-auth-service') {
+                        script {
+                            withCredentials([string(credentialsId: 'heroku-api-key', variable: 'HEROKU_API_KEY')]) {
+                                sh 'heroku auth:token'                  
+                                sh 'heroku container:login'
+                                sh 'heroku container:push web --app online-auth-service'
+                                sh 'heroku container:release web --app online-auth-service' 
+                            }
+
+                        }
+                    }
+                }
+            }
+       
+        }
+    }
